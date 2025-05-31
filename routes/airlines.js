@@ -2,6 +2,7 @@ const express = require('express');
 const airlineModel = require('../models/airlines');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.post('/login', async (req, res) => {
     try {
         const airline = await airlineModel.findOne({ email });
         if (!airline) return res.status(404).json({
-            "message": "Passenger not found"
+            "message": "Airline not found"
         });
 
         const correctPassword = await bcrypt.compare(password, airline.password);
@@ -34,7 +35,7 @@ router.post('/login', async (req, res) => {
         }
 
         const token = jwt.sign({
-            airlineId: airline._id,
+            id: airline._id,
         }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRATION });
 
         return res.status(200).json({
@@ -50,3 +51,18 @@ router.post('/login', async (req, res) => {
     }
 
 })
+
+router.get('/profile', auth, async (req, res) => {
+    const { _id, name, email, created_at } = await airlineModel.findById(req.id);
+    return res.status(200).json({
+        message: "Airline profile",
+        data: {
+            id: _id,
+            name: name,
+            email: email,
+            created_at, created_at
+        }
+    });
+})
+
+module.exports = router;

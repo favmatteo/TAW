@@ -14,4 +14,8 @@ app.listen(port, () => {
 const passengerRoutes = require('./routes/passenger');
 app.use('/api/passenger/', passengerRoutes)
 
+const airlineRoutes = require('./routes/airlines')
+app.use('/api/airline/', airlineRoutes)
+
+
 const config = require('./config');

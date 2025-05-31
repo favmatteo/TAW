@@ -1,0 +1,52 @@
+const express = require('express');
+const airlineModel = require('../models/airlines');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+const router = express.Router();
+
+router.post('/login', async (req, res) => {
+    if (!req.body) {
+        return res.status(400).json({
+            "message": "Bad Request: No data provided"
+        });
+    }
+
+    if (!req.body.email || !req.body.password) {
+        return res.status(400).json({
+            "message": "Bad Request: Missing required fields"
+        });
+    }
+
+    const { email, password } = req.body;
+
+    try {
+        const airline = await airlineModel.findOne({ email });
+        if (!airline) return res.status(404).json({
+            "message": "Passenger not found"
+        });
+
+        const correctPassword = await bcrypt.compare(password, airline.password);
+        if (!correctPassword) {
+            return res.status(401).json({
+                "message": "Unauthorized: Incorrect password"
+            });
+        }
+
+        const token = jwt.sign({
+            airlineId: airline._id,
+        }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRATION });
+
+        return res.status(200).json({
+            message: "Login successful",
+            token: token
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: "Error during login",
+            error: error.message
+        });
+    }
+
+})

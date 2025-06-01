@@ -122,7 +122,11 @@ router.get("/get/:id", async (req, res) => {
             .populate('destination', 'name')
             .populate('intermediary_stop', 'name');
 
-        if (!flight) throw new Error("Flight not found");
+        if (!flight) {
+            return res.status(404).json({
+                message: "Flight not found"
+            });
+        }
 
 
         const seats = await seatSchema.find({ flight: flight._id }, projection = { flight: 0, __v: 0 });
@@ -140,6 +144,44 @@ router.get("/get/:id", async (req, res) => {
             error: error.message
         });
     }
+
+})
+
+router.get("/seats/:id", async (req, res) => {
+    const id = req.params.id;
+    if (!id) {
+        return res.status(400).json({
+            message: "Bad Request",
+            error: "Missing flight ID"
+        });
+    }
+
+    if (!mongoose.isValidObjectId(id)) {
+        return res.status(400).json({
+            message: "Bad Request",
+            error: "Invalid flight ID format"
+        });
+    }
+    try {
+        const flight = await flightSchema.findById(id);
+        if (!flight) {
+            return res.status(404).json({
+                message: "Flight not found"
+            });
+        }
+
+        const seats = await seatSchema.find({ flight: flight._id, 'is_available': true });
+        return res.status(200).json({
+            message: "Available seats",
+            data: seats
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Error fetching seats",
+            error: error.message
+        });
+    }
+
 
 })
 

@@ -6,4 +6,4 @@ const signupSchema = Joi.object({
     password: Joi.string().required(),
 });
 
-module.exports = signupSchema;
+module.exports = signupSchema; 

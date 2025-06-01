@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const auth = require('../middleware/auth');
 const loginSchema = require('../schemas/login');
+const is_airline = require('../middleware/airline');
 
 const router = express.Router();
 
@@ -50,7 +51,7 @@ router.post('/login', async (req, res) => {
 
 })
 
-router.get('/profile', auth, async (req, res) => {
+router.get('/profile', auth, is_airline, async (req, res) => {
     const { _id, name, email, created_at } = await airlineModel.findById(req.id);
     return res.status(200).json({
         message: "Airline profile",

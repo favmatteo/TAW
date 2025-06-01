@@ -3,23 +3,21 @@ const airlineModel = require('../models/airlines');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const auth = require('../middleware/auth');
+const loginSchema = require('../schemas/login');
 
 const router = express.Router();
 
 router.post('/login', async (req, res) => {
-    if (!req.body) {
+    const { error, value } = loginSchema.validate(req.body);
+
+    if (error) {
         return res.status(400).json({
-            "message": "Bad Request: No data provided"
+            message: "Bad Request",
+            error: error ? error.details[0].message : "Invalid data",
         });
     }
 
-    if (!req.body.email || !req.body.password) {
-        return res.status(400).json({
-            "message": "Bad Request: Missing required fields"
-        });
-    }
-
-    const { email, password } = req.body;
+    const { email, password } = value;
 
     try {
         const airline = await airlineModel.findOne({ email });

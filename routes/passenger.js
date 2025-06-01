@@ -4,56 +4,61 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const auth = require('../middleware/auth');
 
+const loginSchema = require('../schemas/login');
+const signupSchema = require('../schemas/signup')
 const router = express.Router();
 
 router.post('/create', async (req, res) => {
-    if (!req.body) {
+    const { error, value } = signupSchema.validate(req.body);
+
+    if (error) {
         return res.status(400).json({
-            "message": "Bad Request: No data provided"
+            message: "Bad Request",
+            error: error ? error.details[0].message : "Invalid data",
         });
     }
 
-    if (!req.body.name || !req.body.email || !req.body.password) {
-        return res.status(400).json({
-            "message": "Bad Request: Missing required fields"
-        });
-    }
-
-    const { name, email, password } = req.body;
+    const { name, email, password } = value;
     const hashedPassword = await bcrypt.hash(password, 10);
 
     try {
+        const exists = await passengerModel.findOne({ email });
+        console.log(exists)
+        if (exists) {
+            return res.status(400).json({
+                message: "Email already in use"
+            })
+        }
         const newPassenger = new passengerModel({
             name,
             email,
             password: hashedPassword
         });
         await newPassenger.save();
-        res.status(201).json({
+        return res.status(201).json({
             message: "Passenger created successfully"
         })
     } catch (error) {
-        res.status(500).json({
+        return res.status(500).json({
             message: "Error creating passenger",
             error: error.message
         });
     }
 });
 
+
 router.post('/login', async (req, res) => {
-    if (!req.body) {
+    const { error, value } = loginSchema.validate(req.body);
+
+    if (error) {
         return res.status(400).json({
-            "message": "Bad Request: No data provided"
+            message: "Bad Request",
+            error: error.details[0].message,
         });
     }
 
-    if (!req.body.email || !req.body.password) {
-        return res.status(400).json({
-            "message": "Bad Request: Missing required fields"
-        });
-    }
 
-    const { email, password } = req.body;
+    const { email, password } = value;
 
     try {
         const passenger = await passengerModel.findOne({ email });

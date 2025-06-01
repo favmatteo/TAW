@@ -3,9 +3,10 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const app = express();
+app.use(express.json());
+
 const port = process.env.PORT;
 
-app.use(express.json());
 
 app.listen(port, () => {
     console.log(`Server in ascolto su http://localhost:${port}`);
@@ -17,5 +18,7 @@ app.use('/api/passenger/', passengerRoutes)
 const airlineRoutes = require('./routes/airlines')
 app.use('/api/airline/', airlineRoutes)
 
+const flightRoutes = require('./routes/flight');
+app.use('/api/flight/', flightRoutes)
 
 const config = require('./config');

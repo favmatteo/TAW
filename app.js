@@ -21,4 +21,7 @@ app.use('/api/airline/', airlineRoutes)
 const flightRoutes = require('./routes/flight');
 app.use('/api/flight/', flightRoutes)
 
+const ticketRoutes = require('./routes/ticket');
+app.use('/api/ticket/', ticketRoutes)
+
 const config = require('./config');

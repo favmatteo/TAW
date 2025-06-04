@@ -5,7 +5,10 @@ const jwt = require('jsonwebtoken');
 const auth = require('../middleware/auth');
 
 const loginSchema = require('../schemas/login');
-const signupSchema = require('../schemas/signup')
+const signupSchema = require('../schemas/signup');
+const is_passenger = require('../middleware/passenger');
+const passenger = require('../models/passenger');
+
 const router = express.Router();
 
 router.post('/create', async (req, res) => {
@@ -104,6 +107,31 @@ router.get('/profile', auth, async (req, res) => {
     });
 })
 
+router.post("/add/money/", auth, is_passenger, async (req, res) => {
+    if(!req.body || !req.body.amount || req.body.amount <= 0) {
+        return res.status(400).json({
+            message: "Bad Request",
+            error: "Invalid amount"
+        });
+    }
+    try {
+        await passengerModel.findByIdAndUpdate(
+            req.id,
+            { $inc: { money: req.body.amount } },
+        );
+        return res.status(200).json({
+            message: "Money added successfully",
+            data: {
+                amount: req.body.amount
+            }
+        });
+    }catch(err) {
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: err.message
+        });
+    }
+})
 
 
 module.exports = router;

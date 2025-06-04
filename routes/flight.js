@@ -95,7 +95,7 @@ router.post("/create/", auth, is_airline, async (req, res) => {
     }
 
     return res.status(200).json({
-        message: "Hi!! :)",
+        message: "Flight created successfully",
         data: value
     });
 })

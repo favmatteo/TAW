@@ -8,6 +8,8 @@ const is_passenger = async (req, res, next) => {
         });
     }
 
+    req.passenger = await passengerModel.findById(req.id, {password: 0});
+
     const exists = await passengerModel.findById(req.id);
     if (!exists) {
         return res.status(401).json({

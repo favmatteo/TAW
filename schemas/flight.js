@@ -15,6 +15,8 @@ const createFlightSchema = Joi.object({
     economy_seats: Joi.number().required(),
     economy_seats_extra_legroom: Joi.number().required(),
 
+    extra_baggage_cost: Joi.number().required(),
+
     business_seats: Joi.number().required(),
     business_seats_extra_legroom: Joi.number().required(),
 

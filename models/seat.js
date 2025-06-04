@@ -2,7 +2,7 @@ const { type } = require('express/lib/response');
 const mongoose = require('mongoose');
 
 const seatSchema = new mongoose.Schema({
-    number: { type: String, required: true },
+    number: { type: Number, required: true },
 
     type: {
         type: String,

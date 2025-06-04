@@ -13,7 +13,7 @@ const seatSchema = new mongoose.Schema({
     is_available: { type: Boolean, default: true, required: true },
 
 
-    flight: { type: mongoose.Schema.Types.ObjectId, ref: 'Flight', required: true },
+    aircraft: { type: mongoose.Schema.Types.ObjectId, ref: 'Aircraft', required: true },
 });
 
 module.exports = mongoose.model('Seat', seatSchema);

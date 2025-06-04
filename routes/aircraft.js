@@ -1,0 +1,88 @@
+const express = require('express');
+const airlineModel = require('../models/airlines');
+const auth = require('../middleware/auth');
+const is_airline = require('../middleware/airline');
+const createAircraftSchema = require('../schemas/aircraft');
+const aircraftSchema = require('../models/aircraft');
+const seatSchema = require('../models/seat');
+
+const router = express.Router();
+
+router.post('/create/', auth, is_airline, async (req, res) => {
+    const {error, value} = createAircraftSchema.validate(req.body);
+    if(error || !value) {
+        return res.status(400).json({
+            message: "Bad Request",
+            error: error ? error.details[0].message : "Invalid data",
+        });
+    }
+    const {
+        name,
+        economy_seats,
+        business_seats,
+        first_class_seats,
+        economy_extra_legroom_seats,
+        business_extra_legroom_seats,
+        first_class_extra_legroom_seats
+    } = value;
+
+    try {
+        const newAircraft = new aircraftSchema({
+            name
+        })
+        newAircraft.save();
+
+        
+
+        let seat_number = 0;
+        const classes = [
+            {
+                type: 'economy',
+                total_seats: economy_seats,
+                extra_legroom_seats: economy_extra_legroom_seats || 0
+            },
+            {
+                type: 'business',
+                total_seats: business_seats,
+                extra_legroom_seats: business_extra_legroom_seats || 0
+            },
+            {
+                type: 'first_class',
+                total_seats: first_class_seats,
+                extra_legroom_seats: first_class_extra_legroom_seats || 0
+            }
+        ]
+
+        for (const seatClass of classes) {
+            const { type, total_seats } = seatClass;
+            let extra = seatClass.extra_legroom_seats;
+
+            for (let i = 0; i < total_seats; i++) {
+                const seat = new seatSchema({
+                    number: seat_number++,
+                    type: type,
+                    is_extra_legroom: extra > 0,
+                    is_available: true,
+                    aircraft: newAircraft._id
+                });
+
+                await seat.save();
+                extra--;
+            }
+        }
+
+        return res.status(201).json({
+            message: "Aircraft created successfully",
+            aircraft: newAircraft
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: err.message
+        });
+    }
+
+})
+
+module.exports = router;

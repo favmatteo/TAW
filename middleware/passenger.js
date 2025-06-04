@@ -10,7 +10,7 @@ const is_passenger = async (req, res, next) => {
 
     req.passenger = await passengerModel.findById(req.id, {password: 0});
 
-    const exists = await passengerModel.findById(req.id);
+    const exists = req.passenger;
     if (!exists) {
         return res.status(401).json({
             message: "Unauthorized: Passenger not found"

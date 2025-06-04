@@ -1,12 +1,16 @@
 const express = require('express');
 const auth = require('../middleware/auth');
 const is_airline = require('../middleware/airline');
-const flightSchema = require('../models/flight');
+const flightModel = require('../models/flight');
 const createFlightSchema = require('../schemas/flight');
-const seatSchema = require('../models/seat');
+const seatModel = require('../models/seat');
+const aircraftModel = require('../models/aircraft');
 const router = express.Router();
-const citySchema = require('../models/city');
 const mongoose = require('mongoose');
+
+ 
+const {route_exists, aircraft_exists} = require('../routes/utils');
+
 
 router.post("/create/", auth, is_airline, async (req, res) => {
 
@@ -18,86 +22,52 @@ router.post("/create/", auth, is_airline, async (req, res) => {
         });
     }
 
-    try {
-
-        const getOrCreateCity = async (cityName) => {
-            let city = await citySchema.findOne({ name: cityName })
-            if (!city) {
-                city = new citySchema({ name: cityName });
-                await city.save();
-            }
-            return city._id;
-        }
-
-        const departureId = await getOrCreateCity(value.departure);
-        const destinationId = await getOrCreateCity(value.destination);
-        const intermediaryStopId = value.intermediary_stop ? await getOrCreateCity(value.intermediary_stop) : null;
-
-        const newFlight = new flightSchema({
-            economy_cost: value.economy_cost,
-            business_cost: value.business_cost,
-            first_class_cost: value.first_class_cost,
-
-            departure_time: value.departure_time,
-            flight_time: value.flight_time,
-
-            departure: departureId,
-            destination: destinationId,
-            intermediary_stop: intermediaryStopId
-        });
-
-        await newFlight.save();
-
-        let seat_number = 0;
-        const classes = [
-            {
-                type: 'economy',
-                total_seats: value.economy_seats,
-                extra_legroom_seats: value.economy_extra_legroom_seats || 0
-            },
-            {
-                type: 'business',
-                total_seats: value.business_seats,
-                extra_legroom_seats: value.business_extra_legroom_seats || 0
-            },
-            {
-                type: 'first_class',
-                total_seats: value.first_class_seats,
-                extra_legroom_seats: value.first_class_extra_legroom_seats || 0
-            }
-        ]
-
-        for (const seatClass of classes) {
-            const { type, total_seats } = seatClass;
-            let extra = seatClass.extra_legroom_seats;
-
-            for (let i = 0; i < total_seats; i++) {
-                const seat = new seatSchema({
-                    number: seat_number++,
-                    type: type,
-                    is_extra_legroom: extra > 0,
-                    is_available: true,
-                    flight: newFlight._id
-                });
-
-                await seat.save();
-                extra--;
-            }
-        }
-
-
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "Error creating flight",
-            error: error.message
+    if(!route_exists(value.route)) {
+        return res.status(400).json({
+            message: "Bad Request",
+            error: "Route does not exist"
         });
     }
 
-    return res.status(200).json({
-        message: "Flight created successfully",
-        data: value
-    });
+    if(!aircraft_exists(value.aircraft)) {
+        return res.status(400).json({
+            message: "Bad Request",
+            error: "Aircraft does not exist"
+        });
+    }
+
+    const { route, aircraft, economy_cost, business_cost, first_class_cost, extra_baggage_cost, departure_time } = value;
+
+    try {
+        
+
+        const flight = new flightModel({
+            route: route,
+            aircraft: aircraft,
+            economy_cost,
+            business_cost,
+            first_class_cost,
+            extra_baggage_cost,
+            departure_time
+        });
+        
+        await flight.save();
+
+        await aircraftModel.findByIdAndUpdate(value.aircraft, {
+            $push: { flights: flight._id }
+        });
+
+        return res.status(201).json({
+            message: "Flight created successfully",
+            data: flight
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: err.message
+        });
+    }
 })
 
 router.get("/get/:id", async (req, res) => {
@@ -117,7 +87,7 @@ router.get("/get/:id", async (req, res) => {
     }
 
     try {
-        const flight = await flightSchema.findById(id)
+        const flight = await flightModel.findById(id)
             .populate('departure', 'name')
             .populate('destination', 'name')
             .populate('intermediary_stop', 'name');
@@ -129,7 +99,7 @@ router.get("/get/:id", async (req, res) => {
         }
 
 
-        const seats = await seatSchema.find({ flight: flight._id }, projection = { flight: 0, __v: 0 });
+        const seats = await seatModel.find({ flight: flight._id }, projection = { flight: 0, __v: 0 });
 
         return res.status(200).json({
             message: "Flight details",
@@ -146,7 +116,7 @@ router.get("/get/:id", async (req, res) => {
     }
 
 })
-
+/*
 router.get("/seats/:id", async (req, res) => {
     const id = req.params.id;
     if (!id) {
@@ -183,6 +153,6 @@ router.get("/seats/:id", async (req, res) => {
     }
 
 
-})
+})*/
 
 module.exports = router;

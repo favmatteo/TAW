@@ -8,7 +8,8 @@ const is_airline = async (req, res, next) => {
         });
     }
 
-    const exists = await airlineModel.findById(req.id);
+    req.airline = await airlineModel.findById(req.id, { password: 0 });
+    const exists = req.airline;
     if (!exists) {
         return res.status(401).json({
             message: "Unauthorized: Airline not found"

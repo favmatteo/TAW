@@ -10,7 +10,6 @@ const ticketSchema = require('../models/ticket');
 
 const is_passenger = require('../middleware/passenger');
 const router = express.Router();
-
 const calculatePriceOfSeat = async (seatType, flightId) => {
     const getPriceOfSeat = await flightSchema.findById(flightId, {
         economy_cost: 1,

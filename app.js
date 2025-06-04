@@ -18,10 +18,16 @@ app.use('/api/passenger/', passengerRoutes)
 const airlineRoutes = require('./routes/airlines')
 app.use('/api/airline/', airlineRoutes)
 
+const routeRoutes = require('./routes/route');
+app.use('/api/route/', routeRoutes);
+
 const flightRoutes = require('./routes/flight');
 app.use('/api/flight/', flightRoutes)
 
-const ticketRoutes = require('./routes/ticket');
-app.use('/api/ticket/', ticketRoutes)
+//const ticketRoutes = require('./routes/ticket');
+//app.use('/api/ticket/', ticketRoutes)
+
+const aircraftRoutes = require('./routes/aircraft');
+app.use('/api/aircraft/', aircraftRoutes);
 
 const config = require('./config');

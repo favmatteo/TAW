@@ -7,7 +7,8 @@ const ticketSchema = new mongoose.Schema({
     passenger: { type: mongoose.Schema.Types.ObjectId, ref: 'Passenger', required: true },
     flight: { type: mongoose.Schema.Types.ObjectId, ref: 'Flight', required: true },
     seat: { type: mongoose.Schema.Types.ObjectId, ref: 'Seat', required: true },
-
+    price: { type: Number, required: true },
+    
     created_at: { type: Date, default: Date.now },
 });
 

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { route } = require('../routes/ticket');
+
 const flightSchema = new mongoose.Schema({
 
     economy_cost: { type: Number, required: true },

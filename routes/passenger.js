@@ -49,7 +49,6 @@ router.post('/create', async (req, res) => {
     }
 });
 
-
 router.post('/login', async (req, res) => {
     const { error, value } = loginSchema.validate(req.body);
 

@@ -12,6 +12,11 @@ app.listen(port, () => {
     console.log(`Server in ascolto su http://localhost:${port}`);
 });
 
+const cors = require('cors');
+app.use(cors({
+    origin: 'http://localhost:4200',
+}))
+
 const passengerRoutes = require('./routes/passenger');
 app.use('/api/passenger/', passengerRoutes)
 

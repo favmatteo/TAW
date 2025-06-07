@@ -21,9 +21,9 @@ router.post('/create/', auth, is_airline, async (req, res) => {
         economy_seats,
         business_seats,
         first_class_seats,
-        economy_extra_legroom_seats,
-        business_extra_legroom_seats,
-        first_class_extra_legroom_seats
+        economy_seats_extra_legroom,
+        business_seats_extra_legroom,
+        first_class_seats_extra_legroom
     } = value;
 
     try {
@@ -39,35 +39,33 @@ router.post('/create/', auth, is_airline, async (req, res) => {
             {
                 type: 'economy',
                 total_seats: economy_seats,
-                extra_legroom_seats: economy_extra_legroom_seats || 0
+                extra_legroom_seats: economy_seats_extra_legroom || 0
             },
             {
                 type: 'business',
                 total_seats: business_seats,
-                extra_legroom_seats: business_extra_legroom_seats || 0
+                extra_legroom_seats: business_seats_extra_legroom || 0
             },
             {
                 type: 'first_class',
                 total_seats: first_class_seats,
-                extra_legroom_seats: first_class_extra_legroom_seats || 0
+                extra_legroom_seats: first_class_seats_extra_legroom || 0
             }
         ]
 
         for (const seatClass of classes) {
-            const { type, total_seats } = seatClass;
-            let extra = seatClass.extra_legroom_seats;
+            const { type, total_seats, extra_legroom_seats } = seatClass;
 
             for (let i = 0; i < total_seats; i++) {
                 const seat = new seatSchema({
                     number: seat_number++,
                     type: type,
-                    is_extra_legroom: extra > 0,
+                    is_extra_legroom: i < extra_legroom_seats,
                     is_available: true,
                     aircraft: newAircraft._id
                 });
 
                 await seat.save();
-                extra--;
             }
         }
 

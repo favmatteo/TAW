@@ -69,6 +69,31 @@ router.post("/create/", auth, is_airline, async (req, res) => {
     }
 })
 
+router.get("/getall/", async (req, res) => {
+    try {
+        const flights = await flightModel.find()
+            .populate('route')
+            .populate('aircraft');
+        
+        if (flights.length === 0) {
+            return res.status(404).json({
+                message: "No flights found"
+            });
+        }
+
+        return res.status(200).json({
+            message: "All flights",
+            data: flights
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: "Error fetching flights",
+            error: error.message
+        });
+    }
+})
+
 router.get("/get/:id", async (req, res) => {
 
     const id = req.params.id;
@@ -78,7 +103,6 @@ router.get("/get/:id", async (req, res) => {
             error: "Missing flight ID"
         });
     }
-
 
     try {
         const flight = await flightModel.findById(id)
@@ -106,5 +130,53 @@ router.get("/get/:id", async (req, res) => {
         });
     }
 })
+
+router.get("/seats/:flight_id", async (req, res) => {
+    const flight_id = req.params.flight_id;
+    const { available } = req.query;
+
+    if(available && (available.toLowerCase() !== 'true' && available.toLowerCase() !== 'false')) {
+        return res.status(400).json({
+            message: "Bad Request",
+            error: "Invalid value for 'available' query parameter. boolean expected."
+        });
+    }
+
+    if(!flight_id || !mongoose.isValidObjectId(flight_id)) {
+        return res.status(400).json({
+            message: "Bad Request",
+            error: "Missing flight ID"
+        });
+    }
+    try {
+        const flight = await flightModel.findById(flight_id).populate('aircraft');
+        if(!flight) {
+            return res.status(404).json({
+                message: "Flight not found"
+            });
+        }
+
+        let seats;
+        if(available) {
+            seats = await seatModel.find({ aircraft: flight.aircraft._id, is_available: available.toLowerCase() });
+        }else{
+            seats = await seatModel.find({ aircraft: flight.aircraft._id });
+        }
+
+        return res.status(200).json({
+            message: "Available seats",
+            data: seats
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            message: "Error fetching seats",
+            error: error.message
+        });
+    }
+
+});
+
+    
 
 module.exports = router;

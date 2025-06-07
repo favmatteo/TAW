@@ -5,8 +5,8 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const routeSchema = require('../models/routes');
 const createRouteSchema = require('../schemas/route');
+
 router.post("/create/", auth, is_airline, async (req, res) => {
-    console.log(req.body);
     const { error, value} = createRouteSchema.validate(req.body);
     if (error || !value) {
         return res.status(400).json({

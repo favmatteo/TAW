@@ -32,8 +32,6 @@ router.post('/create/', auth, is_airline, async (req, res) => {
         })
         newAircraft.save();
 
-        
-
         let seat_number = 0;
         const classes = [
             {

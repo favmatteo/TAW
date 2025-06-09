@@ -133,12 +133,19 @@ router.get("/get/:id", async (req, res) => {
 
 router.get("/seats/:flight_id", async (req, res) => {
     const flight_id = req.params.flight_id;
-    const { available } = req.query;
+    const { available, type } = req.query;
 
     if(available && (available.toLowerCase() !== 'true' && available.toLowerCase() !== 'false')) {
         return res.status(400).json({
             message: "Bad Request",
             error: "Invalid value for 'available' query parameter. boolean expected."
+        });
+    }
+
+    if(type && !['economy', 'business', 'first_class'].includes(type.toLowerCase())) {
+        return res.status(400).json({
+            message: "Bad Request",
+            error: "Invalid value for 'type' query parameter. Valid values are 'economy', 'business', 'first_class'."
         });
     }
 
@@ -157,11 +164,11 @@ router.get("/seats/:flight_id", async (req, res) => {
         }
 
         let seats;
-        if(available) {
-            seats = await seatModel.find({ aircraft: flight.aircraft._id, is_available: available.toLowerCase() });
-        }else{
-            seats = await seatModel.find({ aircraft: flight.aircraft._id });
-        }
+        const filter = { aircraft: flight.aircraft._id };
+        
+        if (available) { filter.is_available = available.toLowerCase() === 'true'; }
+        if (type) { filter.type = type.toLowerCase(); }
+        seats = await seatModel.find(filter);
 
         return res.status(200).json({
             message: "Available seats",

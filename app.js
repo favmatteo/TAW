@@ -5,7 +5,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const port = process.env.PORT;
+const port = process.env.PORT || 3000;
 
 
 app.listen(port, () => {
@@ -14,7 +14,7 @@ app.listen(port, () => {
 
 const cors = require('cors');
 app.use(cors({
-    origin: 'http://localhost:4200',
+    origin: ['http://localhost:4200', 'http://127.0.0.1:4200'],
 }))
 
 const passengerRoutes = require('./routes/passenger');

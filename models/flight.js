@@ -11,6 +11,7 @@ const flightSchema = new mongoose.Schema({
 
     route: { type: mongoose.Schema.Types.ObjectId, ref: 'Route', required: true },
     aircraft: { type: mongoose.Schema.Types.ObjectId, ref: 'Aircraft', required: true },
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'Airline', required: true }
 });
 
 module.exports = mongoose.model('Flight', flightSchema);

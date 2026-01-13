@@ -6,6 +6,8 @@ const routesSchema = new mongoose.Schema({
     flight_time: { type: Number, required: true },
     departure: { type: String, required: true },
     destination: { type: String, required: true },
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'Airline', required: true },
+    /*
     intermediary_stop: {type: String, default: null, required: false, 
         validate: {
             validator: function(value) {
@@ -17,6 +19,7 @@ const routesSchema = new mongoose.Schema({
             message: 'Invalid intermediary stop'
         }
     },
+    */
 });
 
 module.exports = mongoose.model('Route', routesSchema);

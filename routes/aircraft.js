@@ -28,7 +28,8 @@ router.post('/create/', auth, is_airline, async (req, res) => {
 
     try {
         const newAircraft = new aircraftSchema({
-            name
+            name,
+            owner: req.id
         })
         newAircraft.save();
 
@@ -80,5 +81,14 @@ router.post('/create/', auth, is_airline, async (req, res) => {
     }
 
 })
+
+router.get("/my-aircrafts", auth, is_airline, async (req, res) => {
+    try {
+        const aircrafts = await aircraftSchema.find({ owner: req.id });
+        return res.status(200).json({ data: aircrafts });
+    } catch (err) {
+        return res.status(500).json({ message: "Error fetching aircrafts", error: err.message });
+    }
+});
 
 module.exports = router;

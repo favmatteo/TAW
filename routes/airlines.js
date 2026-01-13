@@ -5,8 +5,65 @@ const jwt = require('jsonwebtoken');
 const auth = require('../middleware/auth');
 const loginSchema = require('../schemas/login');
 const is_airline = require('../middleware/airline');
+const isAdmin = require('../middleware/admin');
 
 const router = express.Router();
+
+router.post('/invite', auth, isAdmin, async (req, res) => {
+    const { name, email, password } = req.body;
+    
+    if(!name || !email || !password) {
+        return res.status(400).json({ message: "Name, email and password are required" });
+    }
+
+    try {
+        const existing = await airlineModel.findOne({ email });
+        if(existing) {
+             return res.status(400).json({ message: "Airline already exists" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newAirline = new airlineModel({
+            name,
+            email,
+            password: hashedPassword,
+            must_change_password: true
+        });
+
+        await newAirline.save();
+        return res.status(201).json({ message: "Airline invited successfully" });
+
+    } catch (error) {
+        return res.status(500).json({ message: "Error inviting airline", error: error.message });
+    }
+});
+
+router.put('/setup', auth, is_airline, async (req, res) => {
+    const { password, name } = req.body;
+    
+    // We expect at least password to be changed or confirmed.
+    // The user prompts says "must set its password and any relevant information".
+    
+    try {
+        const airline = await airlineModel.findById(req.id);
+        if(!airline) return res.status(404).json({ message: "Airline not found" });
+
+        if(password) {
+             airline.password = await bcrypt.hash(password, 10);
+        }
+        if(name) {
+            airline.name = name;
+        }
+        
+        airline.must_change_password = false;
+        await airline.save();
+
+        return res.status(200).json({ message: "Airline setup complete" });
+
+    } catch (error) {
+         return res.status(500).json({ message: "Error updating airline", error: error.message });
+    }
+});
 
 router.post('/login', async (req, res) => {
     const { error, value } = loginSchema.validate(req.body);
@@ -35,11 +92,14 @@ router.post('/login', async (req, res) => {
 
         const token = jwt.sign({
             id: airline._id,
+            email: airline.email,
+            role: 'airline'
         }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRATION });
 
         return res.status(200).json({
             message: "Login successful",
-            token: token
+            token: token,
+            must_change_password: airline.must_change_password
         });
 
     } catch (error) {
@@ -52,14 +112,15 @@ router.post('/login', async (req, res) => {
 })
 
 router.get('/profile', auth, is_airline, async (req, res) => {
-    const { _id, name, email, created_at } = await airlineModel.findById(req.id);
+    const { _id, name, email, created_at, must_change_password } = await airlineModel.findById(req.id);
     return res.status(200).json({
         message: "Airline profile",
         data: {
             id: _id,
             name: name,
             email: email,
-            created_at, created_at
+            created_at, created_at,
+            must_change_password
         }
     });
 })

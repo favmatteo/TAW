@@ -20,7 +20,7 @@ router.post("/create/", auth, is_airline, async (req, res) => {
             flight_time,
             departure,
             destination,
-            intermediary_stop
+            owner: req.id
         });
         await newRoute.save();
         return res.status(201).json({
@@ -32,6 +32,15 @@ router.post("/create/", auth, is_airline, async (req, res) => {
             message: "Internal Server Error",
             error: "Error creating route: " + err.message
         });
+    }
+});
+
+router.get("/my-routes", auth, is_airline, async (req, res) => {
+    try {
+        const routes = await routeSchema.find({ owner: req.id });
+        return res.status(200).json({ data: routes });
+    } catch (err) {
+        return res.status(500).json({ message: "Error fetching routes", error: err.message });
     }
 });
 

@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const passengerModel = require('../models/passenger');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -52,78 +53,78 @@ router.post('/buy', auth, is_passenger, async (req, res) => {
         });
     }
 
-    const { seat_number, extra_baggage, flight_id } = value;
+    const requests = Array.isArray(value) ? value : [value];
     
     try {
-        const flight = await flightModel.findById(flight_id).populate('aircraft');
-        if(!flight) {
-            return res.status(404).json({
-                message: "Flight not found"
-            });
+        let totalCost = 0;
+        const purchaseOps = []; 
+
+        // 1. Validation Phase
+        for (const reqItem of requests) {
+            const { seat_number, extra_baggage, flight_id } = reqItem;
+            
+            const flight = await flightModel.findById(flight_id).populate('aircraft');
+            if(!flight) throw new Error(`Flight not found`);
+
+            const seatIndex = flight.seats.findIndex(s => s.number === seat_number);
+            if (seatIndex === -1) throw new Error(`Seat ${seat_number} not found in flight`);
+            
+            const seat = flight.seats[seatIndex];
+            if (!seat.is_available) throw new Error(`Seat ${seat_number} in flight is already taken`);
+
+            if (purchaseOps.some(op => op.flight._id.equals(flight._id) && op.seatIndex === seatIndex)) {
+                 throw new Error(`Cannot buy the same seat twice in one request`);
+            }
+
+            const price = calculatePriceOfSeat(seat, flight, extra_baggage);
+            totalCost += price;
+
+            purchaseOps.push({ flight, seat, seatIndex, price, extra_baggage });
         }
 
-        // Find the seat embedded in the flight
-        const seatIndex = flight.seats.findIndex(s => s.number === seat_number);
-        if (seatIndex === -1) {
-            return res.status(404).json({
-                message: "Seat not found"
-            });
-        }
-
-        const seat = flight.seats[seatIndex];
-
-        if (!seat.is_available) {
-            return res.status(409).json({
-                message: "Seat is already taken"
-            });
-        }
-
-        // Calculate price
-        const price = calculatePriceOfSeat(seat, flight, extra_baggage);
-
-        // Check funds
-        if(req.passenger.money < price) {
+        if(req.passenger.money < totalCost) {
             return res.status(400).json({
                 message: "Insufficient funds",
-                error: "You don't have enough money to buy this ticket"
+                error: "You don't have enough money to buy these tickets"
             });
         }
 
-        // Deduct money
-        req.passenger.money -= price;
+        // 2. Execution Phase
+        req.passenger.money -= totalCost;
         await req.passenger.save();
+        
+        const createdTickets = [];
 
-        // Create ticket
-        const ticket = new ticketModel({
-            flight: flight._id,
-            passenger: req.passenger._id,
-            seat: seat._id,
-            extra_baggage: extra_baggage,
-            price: price,
-            created_at: new Date()
-        });
+        for (const op of purchaseOps) {
+             const { flight, seat, price, extra_baggage } = op;
 
-        // Update seat availability
-        flight.seats[seatIndex].is_available = false;
+             await flightModel.updateOne(
+                 { _id: flight._id, "seats._id": seat._id },
+                 { $set: { "seats.$.is_available": false } }
+             );
 
-        await ticket.save();
-        await flight.save();
+             const ticket = new ticketModel({
+                flight: flight._id,
+                passenger: req.passenger._id,
+                seat: seat._id,
+                extra_baggage: extra_baggage,
+                price: price,
+                created_at: new Date()
+            });
+            await ticket.save();
+            createdTickets.push(ticket);
+        }
 
         res.status(201).json({
-            message: "Ticket purchased successfully",
-            ticket: {
-                _id: ticket._id,
-                flight: flight._id,
-                seat_number: seat.number,
-                price: price,
-                extra_baggage: extra_baggage
-            }
+            message: "Ticket(s) purchased successfully",
+            tickets: createdTickets,
+            remaining_money: req.passenger.money
         });
 
     } catch (err) {
         console.error(err);
         res.status(500).json({
-            message: "Internal Server Error",
+            message: "Purchase failed",
             error: err.message
         });
     }

@@ -152,6 +152,90 @@ router.get("/getall/", async (req, res) => {
             .populate('route')
             .populate('aircraft');
         
+        const { from, to } = req.query;
+
+        // Search Logic
+        if (from && to) {
+            const searchFrom = from.toLowerCase();
+            const searchTo = to.toLowerCase();
+
+            const results = [];
+
+            // 1. Direct Flights
+            const direct = flights.filter(f => 
+                f.route.departure.toLowerCase() === searchFrom && 
+                f.route.destination.toLowerCase() === searchTo
+            );
+
+            direct.forEach(f => {
+                results.push({
+                    _id: f._id, // Keep ID for compatibility if needed, though strictly it's a trip ID now
+                    type: 'direct',
+                    flights: [f],
+                    route: {
+                        departure: f.route.departure,
+                        destination: f.route.destination,
+                        flight_time: f.route.flight_time
+                    },
+                    departure_time: f.departure_time,
+                    arrival_time: new Date(f.departure_time.getTime() + f.route.flight_time * 60000),
+                    economy_cost: f.economy_cost,
+                    business_cost: f.business_cost,
+                    first_class_cost: f.first_class_cost
+                });
+            });
+
+            // 2. 1-Stop Flights
+            const fromFlights = flights.filter(f => f.route.departure.toLowerCase() === searchFrom);
+            
+            // Optimization: Create a map of flights departing from various airports to speed up lookup? 
+            // array size is likely small enough for nested loop for now.
+
+            for (const leg1 of fromFlights) {
+                const leg1Arrival = new Date(leg1.departure_time.getTime() + leg1.route.flight_time * 60000);
+                const stopAirport = leg1.route.destination.toLowerCase();
+
+                // Find connecting flights: departure matches leg1 destination (stopAirport) AND destination is searchTo
+                const connectingFlights = flights.filter(f => 
+                    f.route.departure.toLowerCase() === stopAirport && 
+                    f.route.destination.toLowerCase() === searchTo
+                );
+
+                for (const leg2 of connectingFlights) {
+                    // Check transfer time >= 2 hours
+                    const diffMs = leg2.departure_time - leg1Arrival;
+                    const diffHours = diffMs / (1000 * 60 * 60);
+
+                    if (diffHours >= 2) {
+                        results.push({
+                            type: 'stopover',
+                            flights: [leg1, leg2],
+                            route: {
+                                departure: leg1.route.departure,
+                                destination: leg2.route.destination,
+                                stop: stopAirport,
+                                flight_time: leg1.route.flight_time + leg2.route.flight_time + (diffMs / 60000) // total duration including layover
+                            },
+                             departure_time: leg1.departure_time,
+                             arrival_time: new Date(leg2.departure_time.getTime() + leg2.route.flight_time * 60000),
+                             economy_cost: leg1.economy_cost + leg2.economy_cost,
+                             business_cost: leg1.business_cost + leg2.business_cost,
+                             first_class_cost: leg1.first_class_cost + leg2.first_class_cost
+                        });
+                    }
+                }
+            }
+
+            if (results.length === 0) {
+                 return res.status(404).json({ message: "No flights found" });
+            }
+
+            return res.status(200).json({
+                message: "Search results",
+                data: results
+            });
+        }
+
         if (flights.length === 0) {
             return res.status(404).json({
                 message: "No flights found"

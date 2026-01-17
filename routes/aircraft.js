@@ -29,11 +29,13 @@ router.post('/create/', auth, is_airline, async (req, res) => {
     try {
         const newAircraft = new aircraftSchema({
             name,
-            owner: req.id
+            owner: req.id,
+            seats: [] // Initialize empty seats array
         })
-        newAircraft.save();
+        
+        let seat_number = 1; // Start seat numbering from 1
+        const aircraftSeats = []; // Array to hold embedded seat objects for Aircraft
 
-        let seat_number = 0;
         const classes = [
             {
                 type: 'economy',
@@ -56,17 +58,25 @@ router.post('/create/', auth, is_airline, async (req, res) => {
             const { type, total_seats, extra_legroom_seats } = seatClass;
 
             for (let i = 0; i < total_seats; i++) {
-                const seat = new seatSchema({
+                const seatData = {
                     number: seat_number++,
                     type: type,
                     is_extra_legroom: i < extra_legroom_seats,
                     is_available: true,
                     aircraft: newAircraft._id
-                });
+                };
 
+                // Create separate Seat document (optional, but good for reference)
+                const seat = new seatSchema(seatData);
                 await seat.save();
+                
+                // Add to aircraft's embedded seats
+                aircraftSeats.push(seat);
             }
         }
+        
+        newAircraft.seats = aircraftSeats;
+        await newAircraft.save();
 
         return res.status(201).json({
             message: "Aircraft created successfully",

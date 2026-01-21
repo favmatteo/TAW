@@ -4,8 +4,8 @@ const { validate } = require('./airlines');
 
 const routesSchema = new mongoose.Schema({
     flight_time: { type: Number, required: true },
-    departure: { type: String, required: true },
-    destination: { type: String, required: true },
+    departure: { type: mongoose.Schema.Types.ObjectId, ref: 'Airport', required: true },
+    destination: { type: mongoose.Schema.Types.ObjectId, ref: 'Airport', required: true },
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'Airline', required: true },
     /*
     intermediary_stop: {type: String, default: null, required: false, 

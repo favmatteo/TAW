@@ -9,6 +9,8 @@ const buyTicketSchema = require('../schemas/ticket');
 const flightModel = require('../models/flight');
 const seatModel = require('../models/seat');
 const ticketModel  = require('../models/ticket');
+require('../models/routes');
+require('../models/airport');
 
 const is_passenger = require('../middleware/passenger');
 const router = express.Router();
@@ -135,7 +137,14 @@ router.get('/my-tickets', auth, is_passenger, async (req, res) => {
         const tickets = await ticketModel.find({ passenger: req.id })
             .populate({
                 path: 'flight',
-                populate: { path: 'route' } // Populate route inside flight to show destination
+                populate: { 
+                    path: 'route',
+                    model: 'Route',
+                    populate: [
+                        { path: 'departure', model: 'Airport' },
+                        { path: 'destination', model: 'Airport' }
+                    ]
+                }
             })
             .sort({ created_at: -1 })
             .lean();

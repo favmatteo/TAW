@@ -6,6 +6,7 @@ const Route = require('./models/routes');
 const Flight = require('./models/flight');
 const Passenger = require('./models/passenger');
 const Seat = require('./models/seat');
+const Airport = require('./models/airport');
 
 const seed = async () => {
     try {
@@ -20,9 +21,53 @@ const seed = async () => {
         // Password hash
         const hashedPassword = await bcrypt.hash('password123', 10);
 
+        // 0. Create or Update Airports
+        const airportsData = [
+            { name: 'Malpensa', city: 'Milan', code: 'MXP', country: 'Italy' },
+            { name: 'John F. Kennedy', city: 'New York', code: 'JFK', country: 'USA' },
+            { name: 'Fiumicino', city: 'Rome', code: 'FCO', country: 'Italy' },
+            { name: 'Charles de Gaulle', city: 'Paris', code: 'CDG', country: 'France' },
+            { name: 'Heathrow', city: 'London', code: 'LHR', country: 'UK' },
+            { name: 'Haneda', city: 'Tokyo', code: 'HND', country: 'Japan' },
+            { name: 'Dubai Intl', city: 'Dubai', code: 'DXB', country: 'UAE' }
+        ];
+
+        const createdAirports = {};
+        for (const data of airportsData) {
+            createdAirports[data.code] = await Airport.findOneAndUpdate(
+                { code: data.code },
+                data,
+                { upsert: true, new: true }
+            );
+        }
+
+        const mxp = createdAirports['MXP'];
+        const jfk = createdAirports['JFK'];
+        const fco = createdAirports['FCO'];
+        const cdg = createdAirports['CDG'];
+        const lhr = createdAirports['LHR'];
+        const hnd = createdAirports['HND'];
+        const dxb = createdAirports['DXB'];
+
+        // 0b. Create or Get Airline
+        let airline = await Airline.findOne({ email: 'admin@spaceair.com' });
+        if (!airline) {
+            airline = new Airline({
+                name: 'SpaceAir',
+                email: 'admin@spaceair.com',
+                password: hashedPassword,
+                flights: []
+            });
+            await airline.save();
+        } else {
+             // Reset flights if re-seeding logic implies fresh flights
+             airline.flights = [];
+             await airline.save();
+        }
+
         // 1. Create Aircrafts
-        const aircraft1 = new Aircraft({ name: 'Boeing 737' });
-        const aircraft2 = new Aircraft({ name: 'Airbus A320' });
+        const aircraft1 = new Aircraft({ name: 'Boeing 737', owner: airline._id });
+        const aircraft2 = new Aircraft({ name: 'Airbus A320', owner: airline._id });
         await aircraft1.save();
         await aircraft2.save();
 
@@ -60,23 +105,25 @@ const seed = async () => {
         await Seat.insertMany(seats2);
 
         // 3. Create Routes
+
         const route1 = new Route({
             flight_time: 480, // 8 hours
-            departure: 'Milan',
-            destination: 'New York',
-            intermediary_stop: null
+            departure: mxp._id,
+            destination: jfk._id,
+            owner: airline._id
         });
         const route2 = new Route({
             flight_time: 90,
-            departure: 'Rome',
-            destination: 'Paris',
-            intermediary_stop: null
+            departure: fco._id,
+            destination: cdg._id,
+            owner: airline._id
         });
         const route3 = new Route({
             flight_time: 600,
-            departure: 'London',
-            destination: 'Tokyo',
-            intermediary_stop: 'Dubai'
+            departure: lhr._id,
+            destination: hnd._id,
+            owner: airline._id,
+            // intermediary_stop: dxb._id 
         });
         
         await route1.save();
@@ -91,7 +138,8 @@ const seed = async () => {
             extra_baggage_cost: 50,
             departure_time: new Date(new Date().getTime() + 24 * 60 * 60 * 1000), // Tomorrow
             route: route1._id,
-            aircraft: aircraft1._id
+            aircraft: aircraft1._id,
+            owner: airline._id
         });
         
         const flight2 = new Flight({
@@ -101,7 +149,8 @@ const seed = async () => {
             extra_baggage_cost: 30,
             departure_time: new Date(new Date().getTime() + 48 * 60 * 60 * 1000), // Day after tomorrow
             route: route2._id,
-            aircraft: aircraft2._id
+            aircraft: aircraft2._id,
+            owner: airline._id
         });
 
         // Flight 3 on Route 3
@@ -112,20 +161,16 @@ const seed = async () => {
             extra_baggage_cost: 100,
             departure_time: new Date(new Date().getTime() + 72 * 60 * 60 * 1000), // 3 days later
             route: route3._id,
-            aircraft: aircraft1._id // Reuse aircraft 1 just for data
+            aircraft: aircraft1._id, // Reuse aircraft 1 just for data
+            owner: airline._id
         });
 
         await flight1.save();
         await flight2.save();
         await flight3.save();
 
-        // 5. Create Airline
-        const airline = new Airline({
-            name: 'SpaceAir',
-            email: 'admin@spaceair.com',
-            password: hashedPassword,
-            flights: [flight1._id, flight2._id, flight3._id]
-        });
+        // 5. Update Airline
+        airline.flights = [flight1._id, flight2._id, flight3._id];
         await airline.save();
 
         // 6. Create Passenger

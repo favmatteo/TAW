@@ -35,4 +35,7 @@ app.use('/api/ticket/', ticketRoutes)
 const aircraftRoutes = require('./routes/aircraft');
 app.use('/api/aircraft/', aircraftRoutes);
 
+const airportRoutes = require('./routes/airport');
+app.use('/api/airport/', airportRoutes);
+
 const config = require('./config');

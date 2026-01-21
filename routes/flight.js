@@ -138,7 +138,10 @@ router.get("/statistics", auth, is_airline, async (req, res) => {
 router.get("/my-flights", auth, is_airline, async (req, res) => {
     try {
         const flights = await flightModel.find({ owner: req.id })
-            .populate('route')
+            .populate({
+                path: 'route',
+                populate: { path: 'departure destination' }
+            })
             .populate('aircraft');
         return res.status(200).json({ data: flights });
     } catch (err) {
@@ -149,7 +152,10 @@ router.get("/my-flights", auth, is_airline, async (req, res) => {
 router.get("/getall/", async (req, res) => {
     try {
         const flights = await flightModel.find()
-            .populate('route')
+            .populate({
+                path: 'route',
+                populate: { path: 'departure destination' }
+            })
             .populate('aircraft');
         
         const { from, to } = req.query;
@@ -161,10 +167,18 @@ router.get("/getall/", async (req, res) => {
 
             const results = [];
 
+            const isMatch = (airport, search) => {
+                 if (!airport) return false;
+                 // airport is populated object
+                 return (airport.city && airport.city.toLowerCase() === search) || 
+                        (airport.name && airport.name.toLowerCase() === search) || 
+                        (airport.code && airport.code.toLowerCase() === search);
+            }
+
             // 1. Direct Flights
             const direct = flights.filter(f => 
-                f.route.departure.toLowerCase() === searchFrom && 
-                f.route.destination.toLowerCase() === searchTo
+                isMatch(f.route.departure, searchFrom) && 
+                isMatch(f.route.destination, searchTo)
             );
 
             direct.forEach(f => {
@@ -173,8 +187,8 @@ router.get("/getall/", async (req, res) => {
                     type: 'direct',
                     flights: [f],
                     route: {
-                        departure: f.route.departure,
-                        destination: f.route.destination,
+                        departure: f.route.departure.city,
+                        destination: f.route.destination.city,
                         flight_time: f.route.flight_time
                     },
                     departure_time: f.departure_time,
@@ -186,19 +200,24 @@ router.get("/getall/", async (req, res) => {
             });
 
             // 2. 1-Stop Flights
-            const fromFlights = flights.filter(f => f.route.departure.toLowerCase() === searchFrom);
+            const fromFlights = flights.filter(f => isMatch(f.route.departure, searchFrom));
             
             // Optimization: Create a map of flights departing from various airports to speed up lookup? 
             // array size is likely small enough for nested loop for now.
 
             for (const leg1 of fromFlights) {
                 const leg1Arrival = new Date(leg1.departure_time.getTime() + leg1.route.flight_time * 60000);
-                const stopAirport = leg1.route.destination.toLowerCase();
+                const stopCity = leg1.route.destination.city.toLowerCase(); // Use city for stop matching for now, or ID? ID is safer but previous code used city. Let's use ID comparison if possible.
+                // Wait, previous code used stopAirport = destination.toLowerCase().
+                // If we want stopovers, we need leg1.destination == leg2.departure.
+                // Comparing IDs is best.
+                
+                const stopAirportId = leg1.route.destination._id.toString();
 
                 // Find connecting flights: departure matches leg1 destination (stopAirport) AND destination is searchTo
                 const connectingFlights = flights.filter(f => 
-                    f.route.departure.toLowerCase() === stopAirport && 
-                    f.route.destination.toLowerCase() === searchTo
+                    f.route.departure._id.toString() === stopAirportId && 
+                    isMatch(f.route.destination, searchTo)
                 );
 
                 for (const leg2 of connectingFlights) {
@@ -211,9 +230,9 @@ router.get("/getall/", async (req, res) => {
                             type: 'stopover',
                             flights: [leg1, leg2],
                             route: {
-                                departure: leg1.route.departure,
-                                destination: leg2.route.destination,
-                                stop: stopAirport,
+                                departure: leg1.route.departure.city,
+                                destination: leg2.route.destination.city,
+                                stop: leg1.route.destination.city,
                                 flight_time: leg1.route.flight_time + leg2.route.flight_time + (diffMs / 60000) // total duration including layover
                             },
                              departure_time: leg1.departure_time,

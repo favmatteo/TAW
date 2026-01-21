@@ -114,7 +114,11 @@ router.get("/statistics", auth, is_airline, async (req, res) => {
              { $sort: { count: -1 } },
              { $limit: 5 },
              { $lookup: { from: 'routes', localField: '_id', foreignField: '_id', as: 'route_info' } },
-             { $unwind: '$route_info' }
+             { $unwind: '$route_info' },
+             { $lookup: { from: 'airports', localField: 'route_info.departure', foreignField: '_id', as: 'dep_airport' } },
+             { $unwind: '$dep_airport' },
+             { $lookup: { from: 'airports', localField: 'route_info.destination', foreignField: '_id', as: 'des_airport' } },
+             { $unwind: '$des_airport' }
         ]);
 
         return res.status(200).json({
@@ -123,8 +127,8 @@ router.get("/statistics", auth, is_airline, async (req, res) => {
                 totalRevenue: stats.length > 0 ? stats[0].totalRevenue : 0,
                 totalPassengers: stats.length > 0 ? stats[0].totalPassengers : 0,
                 popularRoutes: routeStats.map(r => ({
-                     departure: r.route_info.departure,
-                     destination: r.route_info.destination,
+                     departure: `${r.dep_airport.city} (${r.dep_airport.code})`,
+                     destination: `${r.des_airport.city} (${r.des_airport.code})`,
                      ticketsSold: r.count
                 }))
             }

@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const loginSchema = require('../schemas/login');
 const is_airline = require('../middleware/airline');
 const isAdmin = require('../middleware/admin');
+const ticketModel = require('../models/ticket');
 
 const router = express.Router();
 
@@ -124,5 +125,52 @@ router.get('/profile', auth, is_airline, async (req, res) => {
         }
     });
 })
+
+// Admin: get stats for all airlines
+router.get('/stats/all', auth, isAdmin, async (req, res) => {
+    try {
+        const airlines = await airlineModel.find();
+        const results = [];
+
+        for (const a of airlines) {
+            // aggregate revenue and passengers for this airline
+            const agg = await ticketModel.aggregate([
+                { $lookup: { from: 'flights', localField: 'flight', foreignField: '_id', as: 'flight_info' } },
+                { $unwind: '$flight_info' },
+                { $match: { 'flight_info.owner': a._id } },
+                { $group: { _id: null, totalRevenue: { $sum: '$price' }, totalPassengers: { $sum: 1 } } }
+            ]);
+
+            // popular routes for this airline
+            const topRoutes = await ticketModel.aggregate([
+                { $lookup: { from: 'flights', localField: 'flight', foreignField: '_id', as: 'flight_info' } },
+                { $unwind: '$flight_info' },
+                { $match: { 'flight_info.owner': a._id } },
+                { $group: { _id: '$flight_info.route', count: { $sum: 1 } } },
+                { $sort: { count: -1 } },
+                { $limit: 5 },
+                { $lookup: { from: 'routes', localField: '_id', foreignField: '_id', as: 'route_info' } },
+                { $unwind: '$route_info' },
+                { $lookup: { from: 'airports', localField: 'route_info.departure', foreignField: '_id', as: 'dep_airport' } },
+                { $unwind: '$dep_airport' },
+                { $lookup: { from: 'airports', localField: 'route_info.destination', foreignField: '_id', as: 'des_airport' } },
+                { $unwind: '$des_airport' },
+                { $project: { departure: { $concat: ['$dep_airport.city', ' (', '$dep_airport.code', ')'] }, destination: { $concat: ['$des_airport.city', ' (', '$des_airport.code', ')'] }, ticketsSold: '$count' } }
+            ]);
+
+            results.push({
+                airlineId: a._id,
+                airlineName: a.name,
+                totalRevenue: agg.length > 0 ? agg[0].totalRevenue : 0,
+                totalPassengers: agg.length > 0 ? agg[0].totalPassengers : 0,
+                popularRoutes: topRoutes
+            });
+        }
+
+        return res.status(200).json({ data: results });
+    } catch (error) {
+        return res.status(500).json({ message: 'Error fetching airlines stats', error: error.message });
+    }
+});
 
 module.exports = router;

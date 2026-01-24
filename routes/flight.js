@@ -112,13 +112,56 @@ router.get("/statistics", auth, is_airline, async (req, res) => {
              { $unwind: '$flight_info' },
              { $group: { _id: '$flight_info.route', count: { $sum: 1 } } },
              { $sort: { count: -1 } },
-             { $limit: 5 },
+             { $limit: 3 },
              { $lookup: { from: 'routes', localField: '_id', foreignField: '_id', as: 'route_info' } },
              { $unwind: '$route_info' },
              { $lookup: { from: 'airports', localField: 'route_info.departure', foreignField: '_id', as: 'dep_airport' } },
              { $unwind: '$dep_airport' },
              { $lookup: { from: 'airports', localField: 'route_info.destination', foreignField: '_id', as: 'des_airport' } },
              { $unwind: '$des_airport' }
+        ]);
+
+        // 3. Revenue & passengers per flight
+        const perFlight = await ticketModel.aggregate([
+            { $match: { flight: { $in: flightIds } } },
+            { $group: { _id: '$flight', totalRevenue: { $sum: '$price' }, totalPassengers: { $sum: 1 } } },
+            { $lookup: { from: 'flights', localField: '_id', foreignField: '_id', as: 'flight_info' } },
+            { $unwind: '$flight_info' },
+            { $lookup: { from: 'routes', localField: 'flight_info.route', foreignField: '_id', as: 'route_info' } },
+            { $unwind: '$route_info' },
+            { $lookup: { from: 'airports', localField: 'route_info.departure', foreignField: '_id', as: 'dep_airport' } },
+            { $unwind: '$dep_airport' },
+            { $lookup: { from: 'airports', localField: 'route_info.destination', foreignField: '_id', as: 'des_airport' } },
+            { $unwind: '$des_airport' },
+            { $project: {
+                flightId: '$_id',
+                totalRevenue: 1,
+                totalPassengers: 1,
+                departure: { $concat: ['$dep_airport.city', ' (', '$dep_airport.code', ')'] },
+                destination: { $concat: ['$des_airport.city', ' (', '$des_airport.code', ')'] },
+                departure_time: '$flight_info.departure_time'
+            } }
+        ]);
+
+        // 4. Totals per route
+        const perRoute = await ticketModel.aggregate([
+            { $match: { flight: { $in: flightIds } } },
+            { $lookup: { from: 'flights', localField: 'flight', foreignField: '_id', as: 'flight_info' } },
+            { $unwind: '$flight_info' },
+            { $group: { _id: '$flight_info.route', totalRevenue: { $sum: '$price' }, totalPassengers: { $sum: 1 } } },
+            { $lookup: { from: 'routes', localField: '_id', foreignField: '_id', as: 'route_info' } },
+            { $unwind: '$route_info' },
+            { $lookup: { from: 'airports', localField: 'route_info.departure', foreignField: '_id', as: 'dep_airport' } },
+            { $unwind: '$dep_airport' },
+            { $lookup: { from: 'airports', localField: 'route_info.destination', foreignField: '_id', as: 'des_airport' } },
+            { $unwind: '$des_airport' },
+            { $project: {
+                routeId: '$_id',
+                departure: { $concat: ['$dep_airport.city', ' (', '$dep_airport.code', ')'] },
+                destination: { $concat: ['$des_airport.city', ' (', '$des_airport.code', ')'] },
+                totalRevenue: 1,
+                totalPassengers: 1
+            } }
         ]);
 
         return res.status(200).json({
@@ -130,7 +173,9 @@ router.get("/statistics", auth, is_airline, async (req, res) => {
                      departure: `${r.dep_airport.city} (${r.dep_airport.code})`,
                      destination: `${r.des_airport.city} (${r.des_airport.code})`,
                      ticketsSold: r.count
-                }))
+                })),
+                perFlight,
+                perRoute
             }
         });
 
@@ -160,34 +205,35 @@ router.get("/getall/", async (req, res) => {
                 path: 'route',
                 populate: { path: 'departure destination' }
             })
-            .populate('aircraft');
+            .populate('aircraft')
+            .populate('owner');
         
         const { from, to } = req.query;
 
-        // Search Logic
-        if (from && to) {
-            const searchFrom = from.toLowerCase();
-            const searchTo = to.toLowerCase();
+        // Helper match function
+        const isMatch = (airport, search) => {
+             if (!airport) return false;
+             return (airport.city && airport.city.toLowerCase() === search) ||
+                    (airport.name && airport.name.toLowerCase() === search) ||
+                    (airport.code && airport.code.toLowerCase() === search);
+        }
 
+        // Search Logic: support from+to, from only (from X to anywhere), to only (from anywhere to X)
+        if (from || to) {
+            const searchFrom = from ? from.toLowerCase() : null;
+            const searchTo = to ? to.toLowerCase() : null;
             const results = [];
 
-            const isMatch = (airport, search) => {
-                 if (!airport) return false;
-                 // airport is populated object
-                 return (airport.city && airport.city.toLowerCase() === search) || 
-                        (airport.name && airport.name.toLowerCase() === search) || 
-                        (airport.code && airport.code.toLowerCase() === search);
-            }
-
-            // 1. Direct Flights
-            const direct = flights.filter(f => 
-                isMatch(f.route.departure, searchFrom) && 
-                isMatch(f.route.destination, searchTo)
-            );
+            // Direct flights matching available criteria
+            const direct = flights.filter(f => {
+                const matchFrom = searchFrom ? isMatch(f.route.departure, searchFrom) : true;
+                const matchTo = searchTo ? isMatch(f.route.destination, searchTo) : true;
+                return matchFrom && matchTo;
+            });
 
             direct.forEach(f => {
                 results.push({
-                    _id: f._id, // Keep ID for compatibility if needed, though strictly it's a trip ID now
+                    _id: f._id,
                     type: 'direct',
                     flights: [f],
                     route: {
@@ -203,60 +249,48 @@ router.get("/getall/", async (req, res) => {
                 });
             });
 
-            // 2. 1-Stop Flights
-            const fromFlights = flights.filter(f => isMatch(f.route.departure, searchFrom));
-            
-            // Optimization: Create a map of flights departing from various airports to speed up lookup? 
-            // array size is likely small enough for nested loop for now.
+            // 1-stop flights: consider legs where leg1 dep matches searchFrom (if provided) and leg2 dest matches searchTo (if provided)
+            const potentialLeg1s = searchFrom ? flights.filter(f => isMatch(f.route.departure, searchFrom)) : flights.slice();
 
-            for (const leg1 of fromFlights) {
+            for (const leg1 of potentialLeg1s) {
                 const leg1Arrival = new Date(leg1.departure_time.getTime() + leg1.route.flight_time * 60000);
-                const stopCity = leg1.route.destination.city.toLowerCase(); // Use city for stop matching for now, or ID? ID is safer but previous code used city. Let's use ID comparison if possible.
-                // Wait, previous code used stopAirport = destination.toLowerCase().
-                // If we want stopovers, we need leg1.destination == leg2.departure.
-                // Comparing IDs is best.
-                
                 const stopAirportId = leg1.route.destination._id.toString();
 
-                // Find connecting flights: departure matches leg1 destination (stopAirport) AND destination is searchTo
-                const connectingFlights = flights.filter(f => 
-                    f.route.departure._id.toString() === stopAirportId && 
-                    isMatch(f.route.destination, searchTo)
-                );
+                // connecting flights depart from stopAirportId
+                const connectingFlights = flights.filter(f => f.route.departure._id.toString() === stopAirportId);
 
                 for (const leg2 of connectingFlights) {
+                    // If searchTo is provided, require leg2 destination match
+                    if (searchTo && !isMatch(leg2.route.destination, searchTo)) continue;
+
                     // Check transfer time >= 2 hours
                     const diffMs = leg2.departure_time - leg1Arrival;
                     const diffHours = diffMs / (1000 * 60 * 60);
+                    if (diffHours < 2) continue;
 
-                    if (diffHours >= 2) {
-                        results.push({
-                            type: 'stopover',
-                            flights: [leg1, leg2],
-                            route: {
-                                departure: leg1.route.departure.city,
-                                destination: leg2.route.destination.city,
-                                stop: leg1.route.destination.city,
-                                flight_time: leg1.route.flight_time + leg2.route.flight_time + (diffMs / 60000) // total duration including layover
-                            },
-                             departure_time: leg1.departure_time,
-                             arrival_time: new Date(leg2.departure_time.getTime() + leg2.route.flight_time * 60000),
-                             economy_cost: leg1.economy_cost + leg2.economy_cost,
-                             business_cost: leg1.business_cost + leg2.business_cost,
-                             first_class_cost: leg1.first_class_cost + leg2.first_class_cost
-                        });
-                    }
+                    results.push({
+                        type: 'stopover',
+                        flights: [leg1, leg2],
+                        route: {
+                            departure: leg1.route.departure.city,
+                            destination: leg2.route.destination.city,
+                            stop: leg1.route.destination.city,
+                            flight_time: leg1.route.flight_time + leg2.route.flight_time + (diffMs / 60000)
+                        },
+                        departure_time: leg1.departure_time,
+                        arrival_time: new Date(leg2.departure_time.getTime() + leg2.route.flight_time * 60000),
+                        economy_cost: leg1.economy_cost + leg2.economy_cost,
+                        business_cost: leg1.business_cost + leg2.business_cost,
+                        first_class_cost: leg1.first_class_cost + leg2.first_class_cost
+                    });
                 }
             }
 
             if (results.length === 0) {
-                 return res.status(404).json({ message: "No flights found" });
+                return res.status(404).json({ message: "No flights found" });
             }
 
-            return res.status(200).json({
-                message: "Search results",
-                data: results
-            });
+            return res.status(200).json({ message: "Search results", data: results });
         }
 
         if (flights.length === 0) {

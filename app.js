@@ -2,6 +2,12 @@ const express = require("express")
 const dotenv = require("dotenv");
 dotenv.config();
 
+/*
+Spiegazione:
+Questo file rappresenta il punto di ingresso principale per un'applicazione backend basata su Express.js.
+Gestisce la configurazione del server, l'importazione delle rotte nella cartella ./routes e l'avvio del server.
+
+*/
 const app = express();
 app.use(express.json());
 
@@ -14,8 +20,12 @@ app.listen(port, () => {
 
 const cors = require('cors');
 app.use(cors({
-    origin: ['http://localhost:4200', 'http://127.0.0.1:4200'],
-}))
+  origin: [
+    'http://localhost:4200',
+    'http://127.0.0.1:4200'
+  ],
+}));
+
 
 const passengerRoutes = require('./routes/passenger');
 app.use('/api/passenger/', passengerRoutes)

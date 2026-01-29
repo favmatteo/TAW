@@ -85,6 +85,20 @@ router.post("/create/", auth, is_airline, async (req, res) => {
 
 const ObjectId = mongoose.Types.ObjectId;
 
+
+// Endpoint per recuperare le statistiche dei voli per una compagnia aerea
+/*
+Funziona in questo modo:
+Riceve la richiesta autenticata di una compagnia aerea.
+Recupera tutti i voli associati alla compagnia aerea.
+Per ogni volo calcola:
+   - Il totale delle entrate generate dalla vendita dei biglietti.
+    - Il numero totale di passeggeri.
+    - Le rotte più richieste in base al numero di biglietti venduti.
+    - Le entrate e i passeggeri per ogni volo.
+    - Le entrate e i passeggeri totali per ogni rotta.
+Restituisce le statistiche in formato JSON.
+*/
 router.get("/statistics", auth, is_airline, async (req, res) => {
     try {
         const airlineId = req.id;
@@ -105,7 +119,7 @@ router.get("/statistics", auth, is_airline, async (req, res) => {
             }
         ]);
         
-        // 2. Most In-Demand Routes
+        // 2. Rotte più popolari
         const routeStats = await ticketModel.aggregate([
              { $match: { flight: { $in: flightIds } } },
              { $lookup: { from: 'flights', localField: 'flight', foreignField: '_id', as: 'flight_info' } },
@@ -121,7 +135,7 @@ router.get("/statistics", auth, is_airline, async (req, res) => {
              { $unwind: '$des_airport' }
         ]);
 
-        // 3. Revenue & passengers per flight
+        // 3. Totale soldi e passeggeri per volo
         const perFlight = await ticketModel.aggregate([
             { $match: { flight: { $in: flightIds } } },
             { $group: { _id: '$flight', totalRevenue: { $sum: '$price' }, totalPassengers: { $sum: 1 } } },
@@ -143,7 +157,7 @@ router.get("/statistics", auth, is_airline, async (req, res) => {
             } }
         ]);
 
-        // 4. Totals per route
+        // 4. Totale soldi e passeggeri per rotta
         const perRoute = await ticketModel.aggregate([
             { $match: { flight: { $in: flightIds } } },
             { $lookup: { from: 'flights', localField: 'flight', foreignField: '_id', as: 'flight_info' } },
@@ -184,6 +198,7 @@ router.get("/statistics", auth, is_airline, async (req, res) => {
     }
 });
 
+// Endpoint per recuperare tutti i voli di una compagnia aerea autenticata
 router.get("/my-flights", auth, is_airline, async (req, res) => {
     try {
         const flights = await flightModel.find({ owner: req.id })
@@ -198,6 +213,21 @@ router.get("/my-flights", auth, is_airline, async (req, res) => {
     }
 });
 
+/*
+La funzione isMatch verifica se un aeroporto corrisponde a un termine di ricerca confrontando città, nome e codice.
+Restituisce true se c'è una corrispondenza, altrimenti false.
+*/
+function isMatchFunction(airport, search) {
+    if (!airport) 
+        return false;
+    let match = false;
+    if (airport.city && airport.city.toLowerCase() === search) match = true;
+    if (airport.name && airport.name.toLowerCase() === search) match = true;
+    if (airport.code && airport.code.toLowerCase() === search) match = true;
+    return match;
+}
+
+// Endpoint per recuperare tutti i voli con funzionalità di ricerca
 router.get("/getall/", async (req, res) => {
     try {
         const flights = await flightModel.find()
@@ -211,12 +241,7 @@ router.get("/getall/", async (req, res) => {
         const { from, to } = req.query;
 
         // Helper match function
-        const isMatch = (airport, search) => {
-             if (!airport) return false;
-             return (airport.city && airport.city.toLowerCase() === search) ||
-                    (airport.name && airport.name.toLowerCase() === search) ||
-                    (airport.code && airport.code.toLowerCase() === search);
-        }
+        const isMatch = isMatchFunction;
 
         // Search Logic: support from+to, from only (from X to anywhere), to only (from anywhere to X)
         if (from || to) {
@@ -230,6 +255,7 @@ router.get("/getall/", async (req, res) => {
                 const matchTo = searchTo ? isMatch(f.route.destination, searchTo) : true;
                 return matchFrom && matchTo;
             });
+            
 
             direct.forEach(f => {
                 results.push({

@@ -15,6 +15,8 @@ require('../models/airport');
 const is_passenger = require('../middleware/passenger');
 const router = express.Router();
 
+
+// Funzione per calcolare il prezzo di un posto a sedere
 const calculatePriceOfSeat = (seat, flight, extradBaggage) => {
     let price = 0;
     
@@ -46,6 +48,7 @@ const calculatePriceOfSeat = (seat, flight, extradBaggage) => {
     return price;
 }
 
+// Endpoint per acquistare i biglietti, solo da passeggeri autenticati
 router.post('/buy', auth, is_passenger, async (req, res) => {
     const { error, value } = buyTicketSchema.validate(req.body);
     if(error || !value) {
@@ -60,8 +63,7 @@ router.post('/buy', auth, is_passenger, async (req, res) => {
     try {
         let totalCost = 0;
         const purchaseOps = []; 
-
-        // 1. Validation Phase
+        // Verifica la disponibilità dei posti e calcola il costo totale
         for (const reqItem of requests) {
             const { seat_number, extra_baggage, flight_id } = reqItem;
             
@@ -84,14 +86,14 @@ router.post('/buy', auth, is_passenger, async (req, res) => {
             purchaseOps.push({ flight, seat, seatIndex, price, extra_baggage });
         }
 
+        // Controlla se il passeggero ha abbastanza soldi
         if(req.passenger.money < totalCost) {
             return res.status(400).json({
-                message: "Insufficient funds",
+                message: "Insufficient money",
                 error: "You don't have enough money to buy these tickets"
             });
         }
 
-        // 2. Execution Phase
         req.passenger.money -= totalCost;
         await req.passenger.save();
         
@@ -132,6 +134,7 @@ router.post('/buy', auth, is_passenger, async (req, res) => {
     }
 });
 
+// Endpoint per ottenere i biglietti acquistati dal passeggero autenticato
 router.get('/my-tickets', auth, is_passenger, async (req, res) => {
     try {
         const tickets = await ticketModel.find({ passenger: req.id })
@@ -149,8 +152,8 @@ router.get('/my-tickets', auth, is_passenger, async (req, res) => {
             .sort({ created_at: -1 })
             .lean();
 
-        // Enarich tickets with seat details found in flight.seats
-        const enrichedTickets = tickets.map(ticket => {
+            // Ottenere le informazioni sui posti a sedere associati ai biglietti
+            const enrichedTickets = tickets.map(ticket => {
             if (ticket.flight && ticket.flight.seats) {
                 const seatInfo = ticket.flight.seats.find(s => s._id.toString() === ticket.seat.toString());
                 if (seatInfo) {
@@ -158,7 +161,7 @@ router.get('/my-tickets', auth, is_passenger, async (req, res) => {
                     ticket.seat_type = seatInfo.type;
                     ticket.is_extra_legroom = seatInfo.is_extra_legroom;
                 }
-                // Remove seats array from response to reduce payload size
+                // Rimuovi il posto a sedere completo per evitare ridondanza
                 delete ticket.flight.seats;
             }
             return ticket;

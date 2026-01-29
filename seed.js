@@ -9,11 +9,13 @@ const Seat = require('./models/seat');
 const Ticket = require('./models/ticket');
 const Airport = require('./models/airport');
 
+
+
 const seed = async () => {
     try {
         console.log("Seeding database with realistic data including Airports...");
 
-        // 0. Clear existing data
+        // Pulisce tutti i dati esistenti
         await Ticket.deleteMany({});
         await Flight.deleteMany({});
         await Route.deleteMany({});
@@ -29,7 +31,7 @@ const seed = async () => {
         const hashedPassword = await bcrypt.hash('password123', 10);
         const adminPassword = await bcrypt.hash('admin', 10);
 
-        // 1. Create Airports (Realistic international hubs)
+        //Creazione Aeroporti
         const mxp = new Airport({ name: 'Malpensa Airport', city: 'Milan', code: 'MXP', country: 'Italy' });
         const fra = new Airport({ name: 'Frankfurt Airport', city: 'Frankfurt', code: 'FRA', country: 'Germany' });
         const jfk = new Airport({ name: 'John F. Kennedy International Airport', city: 'New York', code: 'JFK', country: 'USA' });
@@ -50,7 +52,7 @@ const seed = async () => {
 
         console.log("Airports created.");
 
-        // 2. Create Airlines
+        //Creazione Airlines
         const lufthansa = new Airline({
             name: 'Lufthansa',
             email: 'admin@lufthansa.com',
@@ -77,7 +79,7 @@ const seed = async () => {
         await ba.save();
         console.log("Airlines created.");
 
-        // 3. Create Passengers
+        //Creazione Passengers
         const passengersData = [
             { name: 'Admin User', email: 'admin@admin.com', money: 999999, password: adminPassword }, // Admin User
             { name: 'Mario Rossi', email: 'mario@example.com', money: 5000, password: hashedPassword },
@@ -98,16 +100,12 @@ const seed = async () => {
         }
         console.log("Passengers created.");
 
-        // 4. Create Aircrafts
-        // Helper to generate seats
+        //Creazione Aircrafts
         const createSeats = (total, businessCount, aircraftId) => {
             const seats = [];
             for (let i = 1; i <= total; i++) {
                 let type = 'economy';
                 if (i <= businessCount) type = 'business';
-                
-                // Extra legroom logic: emergency exits usually
-                // Simple logic: row after business and middle of plane
                 const isExtra = (i > businessCount && i <= businessCount + 6) || (i > total/2 && i <= total/2 + 6);
 
                 seats.push({
@@ -121,36 +119,30 @@ const seed = async () => {
             return seats;
         };
 
-        // Lufthansa A320
         const aircraftLh1 = new Aircraft({ name: 'Airbus A320neo', owner: lufthansa._id, seats: [] });
         aircraftLh1.seats = createSeats(180, 24, aircraftLh1._id);
         await aircraftLh1.save();
 
-        // Lufthansa B747 (Long haul)
         const aircraftLh2 = new Aircraft({ name: 'Boeing 747-8', owner: lufthansa._id, seats: [] });
         aircraftLh2.seats = createSeats(360, 50, aircraftLh2._id);
         await aircraftLh2.save();
 
-        // Delta B777
         const aircraftDl1 = new Aircraft({ name: 'Boeing 777-200LR', owner: delta._id, seats: [] });
         aircraftDl1.seats = createSeats(300, 40, aircraftDl1._id);
         await aircraftDl1.save();
 
-        // BA A320
         const aircraftBa1 = new Aircraft({ name: 'Airbus A320', owner: ba._id, seats: [] });
         aircraftBa1.seats = createSeats(170, 20, aircraftBa1._id);
         await aircraftBa1.save();
         
-        // BA B777
         const aircraftBa2 = new Aircraft({ name: 'Boeing 777-300', owner: ba._id, seats: [] });
         aircraftBa2.seats = createSeats(250, 40, aircraftBa2._id);
         await aircraftBa2.save();
 
         console.log("Aircrafts created.");
 
-        // 5. Create Routes (Using Airport IDs)
+        //Creazione Routes
         
-        // Lufthansa Routes
         const routeMxpFra = new Route({
             flight_time: 85,
             departure: mxp._id, // Airport ID
@@ -164,7 +156,6 @@ const seed = async () => {
             owner: lufthansa._id
         });
 
-        // Delta Routes
         const routeFcoAtl = new Route({
             flight_time: 660,
             departure: fco._id,
@@ -178,7 +169,6 @@ const seed = async () => {
              owner: delta._id
         });
 
-        // BA Routes
         const routeFcoLhr = new Route({
             flight_time: 160, 
             departure: fco._id,
@@ -201,12 +191,11 @@ const seed = async () => {
 
         console.log("Routes created.");
 
-        // 6. Create Flights with Layover Logic
+        //Creazione Flights
         const today = new Date();
         const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
 
-        // --- Sequence 1: MXP -> FRA -> JFK (Lufthansa) ---
-        // Leg 1: MXP -> FRA
+
         const depTime1 = new Date(tomorrow); depTime1.setHours(9, 30, 0, 0); // 09:30
         const flightMxpFra = new Flight({
             economy_cost: 150,
@@ -220,7 +209,6 @@ const seed = async () => {
             owner: lufthansa._id
         });
 
-        // Leg 2: FRA -> JFK
         const depTime2 = new Date(tomorrow); depTime2.setHours(13, 0, 0, 0); // 13:00 (Layover 2h after arr ~11:00)
         const flightFraJfk = new Flight({
             economy_cost: 600,
@@ -234,8 +222,6 @@ const seed = async () => {
             owner: lufthansa._id
         });
 
-        // --- Sequence 2: FCO -> ATL -> JFK (Delta) ---
-        // Leg 1: FCO -> ATL (Long haul start)
         const depTime3 = new Date(tomorrow); depTime3.setHours(10, 0, 0, 0); // 10:00
         const flightFcoAtl = new Flight({
             economy_cost: 750,
@@ -249,7 +235,6 @@ const seed = async () => {
             owner: delta._id
         });
 
-        // Leg 2: ATL -> JFK (Domestic connection)
         const depTime4 = new Date(tomorrow); depTime4.setHours(23, 0, 0, 0);
         const flightAtlJfk = new Flight({
              economy_cost: 180,
@@ -261,9 +246,7 @@ const seed = async () => {
              aircraft: aircraftDl1._id, // Using same plane type but physically different theoretically, but for seed ok
              owner: delta._id
         });
-        
-        // --- Sequence 3: FCO -> LHR -> HND (British Airways) ---
-        // Leg 1: FCO -> LHR
+
         const depTime5 = new Date(tomorrow); depTime5.setHours(14, 0, 0, 0); 
         const flightFcoLhr = new Flight({
             economy_cost: 200,
@@ -276,7 +259,6 @@ const seed = async () => {
             owner: ba._id
         });
 
-        // Leg 2: LHR -> HND
         const depTime6 = new Date(tomorrow); depTime6.setHours(19, 0, 0, 0);
         const flightLhrHnd = new Flight({
              economy_cost: 900,
@@ -298,7 +280,7 @@ const seed = async () => {
 
         console.log("Flights created.");
 
-        // 7. Update Airlines with flights
+        //Aggiorna Airlines con i voli creati
         lufthansa.flights.push(flightMxpFra._id, flightFraJfk._id);
         await lufthansa.save();
 
@@ -310,9 +292,8 @@ const seed = async () => {
         
         console.log("Airlines updated.");
 
-        // 8. Create Tickets (Simulation of booking)
+        //Creazione Tickets di esempio
         
-        // Booking MXP -> FRA -> JFK for Passenger 2 (Mario)
         let f1 = await Flight.findById(flightMxpFra._id);
         let s1 = f1.seats.find(s => s.number === 12); // Economy
         
@@ -344,7 +325,7 @@ const seed = async () => {
             await t2.save();
         }
 
-        console.log("Sample tickets created.");
+        console.log("Tickets created.");
         console.log("Database seeded successfully!");
 
     } catch (error) {

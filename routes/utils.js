@@ -2,6 +2,7 @@ const aircraftModel = require('../models/aircraft');
 const mongoose = require('mongoose');
 const routeSchema = require('../models/routes');
 
+// Funzione per verificare se una rotta esiste nel database
 const route_exists = async (id) => {
     if (!id || !mongoose.isValidObjectId(id)) {
         return false;
@@ -16,6 +17,7 @@ const route_exists = async (id) => {
     }
 }
 
+// Funzione per verificare se un aircraft esiste nel database
 const aircraft_exists = async (id) => {
     if (!id || !mongoose.isValidObjectId(id)) {
         return false;

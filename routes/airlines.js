@@ -10,6 +10,7 @@ const ticketModel = require('../models/ticket');
 
 const router = express.Router();
 
+// Invito ad una nuova airline (solo Admin)
 router.post('/invite', auth, isAdmin, async (req, res) => {
     const { name, email, password } = req.body;
     
@@ -39,6 +40,7 @@ router.post('/invite', auth, isAdmin, async (req, res) => {
     }
 });
 
+// Serve per settare la password iniziale ad una airline invitata
 router.put('/setup', auth, is_airline, async (req, res) => {
     const { password, name } = req.body;
     
@@ -66,6 +68,7 @@ router.put('/setup', auth, is_airline, async (req, res) => {
     }
 });
 
+// Login airline
 router.post('/login', async (req, res) => {
     const { error, value } = loginSchema.validate(req.body);
 
@@ -112,6 +115,7 @@ router.post('/login', async (req, res) => {
 
 })
 
+// Ottieni le informazioni dell'airline
 router.get('/profile', auth, is_airline, async (req, res) => {
     const { _id, name, email, created_at, must_change_password } = await airlineModel.findById(req.id);
     return res.status(200).json({
@@ -126,14 +130,14 @@ router.get('/profile', auth, is_airline, async (req, res) => {
     });
 })
 
-// Admin: get stats for all airlines
+// Statistiche di tutte le airlines (Admin)
 router.get('/stats/all', auth, isAdmin, async (req, res) => {
     try {
         const airlines = await airlineModel.find();
         const results = [];
 
         for (const a of airlines) {
-            // aggregate revenue and passengers for this airline
+            // 
             const agg = await ticketModel.aggregate([
                 { $lookup: { from: 'flights', localField: 'flight', foreignField: '_id', as: 'flight_info' } },
                 { $unwind: '$flight_info' },
@@ -141,7 +145,7 @@ router.get('/stats/all', auth, isAdmin, async (req, res) => {
                 { $group: { _id: null, totalRevenue: { $sum: '$price' }, totalPassengers: { $sum: 1 } } }
             ]);
 
-            // popular routes for this airline
+            // le route più popolari per questa airline
             const topRoutes = await ticketModel.aggregate([
                 { $lookup: { from: 'flights', localField: 'flight', foreignField: '_id', as: 'flight_info' } },
                 { $unwind: '$flight_info' },
@@ -158,11 +162,21 @@ router.get('/stats/all', auth, isAdmin, async (req, res) => {
                 { $project: { departure: { $concat: ['$dep_airport.city', ' (', '$dep_airport.code', ')'] }, destination: { $concat: ['$des_airport.city', ' (', '$des_airport.code', ')'] }, ticketsSold: '$count' } }
             ]);
 
+            totalRevenue = 0;
+            if(arr.length > 0) {
+                totalRevenue = agg[0].totalRevenue;
+            }
+
+            totalPassengers = 0;
+            if(agg.length > 0) {
+                totalPassengers = agg[0].totalPassengers;
+            }
+
             results.push({
                 airlineId: a._id,
                 airlineName: a.name,
-                totalRevenue: agg.length > 0 ? agg[0].totalRevenue : 0,
-                totalPassengers: agg.length > 0 ? agg[0].totalPassengers : 0,
+                totalRevenue: totalRevenue,
+                totalPassengers: totalPassengers,
                 popularRoutes: topRoutes
             });
         }

@@ -13,6 +13,9 @@ const router = express.Router();
 
 const isAdmin = require('../middleware/admin');
 const ticketModel = require('../models/ticket');
+
+
+// Creazione di un nuovo passeggero
 router.post('/create', async (req, res) => {
     const { error, value } = signupSchema.validate(req.body);
 
@@ -51,7 +54,7 @@ router.post('/create', async (req, res) => {
     }
 });
 
-// Admin: list all passengers
+// Ottieni tutti i passeggeri (solo Admin)
 router.get('/all', auth, isAdmin, async (req, res) => {
     try {
         const passengers = await passengerModel.find().select('-password').sort({ created_at: -1 });
@@ -61,7 +64,7 @@ router.get('/all', auth, isAdmin, async (req, res) => {
     }
 });
 
-// Admin: delete passenger and their tickets
+// Elimina un passeggero tramite l'id (solo Admin)
 router.delete('/:id', auth, isAdmin, async (req, res) => {
     const id = req.params.id;
     if (!id) return res.status(400).json({ message: 'Bad Request', error: 'Missing passenger id' });
@@ -81,6 +84,7 @@ router.delete('/:id', auth, isAdmin, async (req, res) => {
     }
 });
 
+// Login del passeggero
 router.post('/login', async (req, res) => {
     const { error, value } = loginSchema.validate(req.body);
 
@@ -107,6 +111,7 @@ router.post('/login', async (req, res) => {
             });
         }
 
+        // Genera il token JWT per l'autenticazione e aggiunge il ruolo
         const token = jwt.sign({
             id: passenger._id,
             email: passenger.email,
@@ -128,6 +133,7 @@ router.post('/login', async (req, res) => {
 
 })
 
+// Ottieni il profilo del passeggero autenticato
 router.get('/profile', auth, async (req, res) => {
     const p = await passengerModel.findById(req.id);
     if (!p) return res.status(404).json({ message: 'Passenger not found' });
@@ -144,6 +150,7 @@ router.get('/profile', auth, async (req, res) => {
     });
 })
 
+// Aggiungi denaro al profilo del passeggero autenticato
 router.post("/add/money/", auth, is_passenger, async (req, res) => {
     if(!req.body || !req.body.amount || req.body.amount <= 0) {
         return res.status(400).json({

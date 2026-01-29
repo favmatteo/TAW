@@ -8,6 +8,7 @@ const seatSchema = require('../models/seat');
 
 const router = express.Router();
 
+// Creazione di un nuovo aircraft con i relativi posti a sedere
 router.post('/create/', auth, is_airline, async (req, res) => {
     const {error, value} = createAircraftSchema.validate(req.body);
     if(error || !value) {
@@ -30,11 +31,11 @@ router.post('/create/', auth, is_airline, async (req, res) => {
         const newAircraft = new aircraftSchema({
             name,
             owner: req.id,
-            seats: [] // Initialize empty seats array
+            seats: [] 
         })
         
-        let seat_number = 1; // Start seat numbering from 1
-        const aircraftSeats = []; // Array to hold embedded seat objects for Aircraft
+        let seat_number = 1; // primo numero di posto
+        const aircraftSeats = [];
 
         const classes = [
             {
@@ -92,6 +93,7 @@ router.post('/create/', auth, is_airline, async (req, res) => {
 
 })
 
+// Recupera tutti gli aircrafts di una specifica airline
 router.get("/my-aircrafts", auth, is_airline, async (req, res) => {
     try {
         const aircrafts = await aircraftSchema.find({ owner: req.id });

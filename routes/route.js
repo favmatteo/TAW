@@ -7,6 +7,7 @@ const routeSchema = require('../models/routes');
 const createRouteSchema = require('../schemas/route');
 const airportModel = require('../models/airport');
 
+// Creazione di una nuova rotta, accessibile solo alle compagnie aeree
 router.post("/create/", auth, is_airline, async (req, res) => {
     const { error, value} = createRouteSchema.validate(req.body);
     if (error || !value) {
@@ -25,14 +26,7 @@ router.post("/create/", auth, is_airline, async (req, res) => {
         $or: [{ city: destination }, { code: destination }, { name: destination }] 
     });
 
-    // Validazione opzionale: se non esistono aeroporti nel DB, potremmo permettere inserimento libero?
-    // "Fai i dovuti cambiamenti": probabilmente si intende restrittivo.
-    // Tuttavia, se il DB è vuoto, nessuno può creare rotte.
-    // Assumiamo che se ci sono aeroporti, deve matchare. Se no, fallback?
-    // Meglio: se abbiamo introdotto il model, usiamolo. 
-    // Se l'utente non ha popolato la tabella aeroporti, non può creare rotte. Ha senso.
     
-    // Per sicurezza check count
     const airportCount = await airportModel.countDocuments();
     if (airportCount > 0) {
         if (!depAirport) {
@@ -63,6 +57,7 @@ router.post("/create/", auth, is_airline, async (req, res) => {
     }
 });
 
+// Recupera tutte le rotte create dalla compagnia aerea autenticata
 router.get("/my-routes", auth, is_airline, async (req, res) => {
     try {
         const routes = await routeSchema.find({ owner: req.id })

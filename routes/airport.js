@@ -3,9 +3,9 @@ const router = express.Router();
 const airportModel = require('../models/airport');
 const airportSchema = require('../schemas/airport');
 const auth = require('../middleware/auth');
-const isAdmin = require('../middleware/admin'); // Assuming admin middleware handles authorization
+const isAdmin = require('../middleware/admin');
 
-// Create Airport (Admin only)
+// Creazione Airport (solo per Admin)
 router.post('/create', auth, isAdmin, async (req, res) => {
     const { error, value } = airportSchema.validate(req.body);
     if (error) {
@@ -27,7 +27,7 @@ router.post('/create', auth, isAdmin, async (req, res) => {
     }
 });
 
-// Get all airports (Public or Auth)
+// Mostra tutti gli aeroporti
 router.get('/getall', async (req, res) => {
     try {
         const airports = await airportModel.find().sort({ city: 1 });
@@ -37,7 +37,7 @@ router.get('/getall', async (req, res) => {
     }
 });
 
-// Search airports by city or code
+// Cerca aeroporti per città, codice o nome
 router.get('/search', async (req, res) => {
     const { q } = req.query;
     if (!q) return res.status(400).json({ message: "Missing query" });

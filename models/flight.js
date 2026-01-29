@@ -17,10 +17,15 @@ const flightSchema = new mongoose.Schema({
     
     seats: [seat.schema],
 });
+
 /*
 Trigger che copia lo schema di seat riferito all'aircraft del volo
+prima di salvare un nuovo volo.
+Funziona in questo modo:
+- Controlla se il volo è nuovo (isNew) e se ha un riferimento ad un aircraft.
+- Recupera l'aircraft dal database usando l'ID.
+- Copia i posti dall'aircraft al volo, resettando la disponibilità di ogni posto a true.
 */
-
 flightSchema.pre('save', async function(next) {
     if (this.isNew && this.aircraft) {
         try {
